@@ -36,15 +36,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
           script: |
-            rm -rf /app/temp
-            mkdir -p /app/temp
-            cd /app/temp
-            git clone https://github.com/${{ github.repository }}.git .
-            npm ci
-            npm run build
-            cp -r build/* /app/
-            cp docker-compose.yml /app/
-            cp nginx.conf /app/
             cd /app
+            git pull
             docker-compose up -d --build
-            rm -rf /app/temp
