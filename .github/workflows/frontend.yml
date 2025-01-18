@@ -38,4 +38,8 @@ jobs:
           script: |
             cd /app
             git pull
-            docker-compose up -d --build
+            docker build -t frontend-build .
+            docker run --name frontend-build-container frontend-build
+            rm -R static
+            docker cp frontend-build-container:/static ./static
+            docker rm frontend-build-container

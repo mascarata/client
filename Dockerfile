@@ -23,7 +23,4 @@ WORKDIR /static
 # Копируем статику из этапа сборки
 COPY --from=build /app/dist /static
 
-# Задаем директорию как рабочую
-VOLUME /static
-
 CMD ["sh"]

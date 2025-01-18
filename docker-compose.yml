@@ -1,9 +1,0 @@
-version: '3.9'
-services:
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ./static:/static
-    command: sh -c "cp -r /static/* /output"
