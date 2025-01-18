@@ -1,0 +1,84 @@
+name: CI/CD Frontend
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Хуярим код из репы
+        uses: actions/checkout@v3
+
+      - name: Ставим ноду
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Ставим зависимости
+        run: npm ci
+
+      - name: Проверяем линтером
+        run: npm run lint
+
+      - name: Собираем
+        run: npm run build
+
+      - name: Логинимся в GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Собираем и пушим образ
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: Подготавливаем файлы для деплоя
+        run: |
+          mkdir -p deploy
+          cp docker-compose.yml deploy/
+          cp nginx.conf deploy/
+          # Подменяем имя образа в docker-compose
+          sed -i "s|build:|image: ghcr.io/${{ github.repository }}:latest|g" deploy/docker-compose.yml
+          sed -i "/dockerfile:/d" deploy/docker-compose.yml
+
+      - name: Копируем конфиги на сервер
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "deploy/*"
+          target: "/app"  # Путь на сервере куда копировать
+          strip_components: 1
+
+      - name: Деплоим на сервер
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /app  # Путь где лежат конфиги
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker-compose pull
+            docker-compose up -d
