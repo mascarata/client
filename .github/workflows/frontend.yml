@@ -6,16 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     
     steps:
       - name: Хуярим код из репы
@@ -36,49 +29,22 @@ jobs:
       - name: Собираем
         run: npm run build
 
-      - name: Логинимся в GitHub Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Собираем и пушим образ
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
-
-      - name: Подготавливаем файлы для деплоя
-        run: |
-          mkdir -p deploy
-          cp docker-compose.yml deploy/
-          cp nginx.conf deploy/
-          # Подменяем имя образа в docker-compose
-          sed -i "s|build:|image: ghcr.io/${{ github.repository }}:latest|g" deploy/docker-compose.yml
-          sed -i "/dockerfile:/d" deploy/docker-compose.yml
-
-      - name: Копируем конфиги на сервер
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}  # Вместо ключа теперь пароль
-          source: "deploy/*"
-          target: "/app"
-          strip_components: 1
-
       - name: Деплоим на сервер
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          password: ${{ secrets.SERVER_PASSWORD }}  # И тут пароль
+          password: ${{ secrets.SERVER_PASSWORD }}
           script: |
+            rm -rf /app/temp
+            mkdir -p /app/temp
+            cd /app/temp
+            git clone https://github.com/${{ github.repository }}.git .
+            npm ci
+            npm run build
+            cp -r build/* /app/
+            cp docker-compose.yml /app/
+            cp nginx.conf /app/
             cd /app
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
-            docker-compose pull
-            docker-compose up -d
+            docker-compose up -d --build
+            rm -rf /app/temp
