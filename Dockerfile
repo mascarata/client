@@ -1,20 +1,29 @@
-# Билдим фронт
-FROM node:18-alpine as builder
+# Используем подходящий образ для сборки
+FROM node:18 AS build
+
+# Создаем рабочую директорию
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+
+# Копируем package.json и package-lock.json
+COPY package*.json ./
+
+# Устанавливаем зависимости
+RUN npm install
+
+# Копируем исходный код
 COPY . .
+
+# Собираем проект
 RUN npm run build
 
-# Основной образ с nginx
-FROM nginx:alpine
-RUN apk add --no-cache bash
-COPY --from=builder /app/dist /usr/share/nginx/html/
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Второй этап — минимальный образ для хранения собранной статики
+FROM alpine:3.18 AS static
+WORKDIR /static
 
-# Здоровье контейнера
-HEALTHCHECK --interval=30s --timeout=3s \
-    CMD curl -f http://localhost/ || exit 1
+# Копируем статику из этапа сборки
+COPY --from=build /app/dist /static
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# Задаем директорию как рабочую
+VOLUME /static
+
+CMD ["sh"]
