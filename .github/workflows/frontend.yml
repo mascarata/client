@@ -43,3 +43,4 @@ jobs:
             rm -R static
             docker cp frontend-build-container:/static ./static
             docker rm frontend-build-container
+            sudo systemctl restart nginx
