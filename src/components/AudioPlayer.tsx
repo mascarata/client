@@ -51,7 +51,7 @@ const AudioPlayer: React.FC = () => {
       onMouseLeave={() => setShowVolumeSlider(false)}
     >
       <audio ref={audioRef}>
-        <source src="http://mascarata.space:8000/stream" type="audio/mpeg" />
+        <source src="https://radio.mascarata.space/listen/ivan/radio.mp3" type="audio/mpeg" />
         Ваш браузер не поддерживает аудиовоспроизведение.
       </audio>
       <motion.button
